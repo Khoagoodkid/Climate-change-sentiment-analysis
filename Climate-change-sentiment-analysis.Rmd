@@ -1,0 +1,232 @@
+---
+title: "Assignment 12"
+author: "Pham Anh Khoa Ha"
+date: "2024-12-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo =TRUE)
+```
+
+```{r}
+if(!require("dplyr")) {
+  install.packages("dplyr")
+}
+if(!require("tidytext")) {
+  install.packages("tidytext")
+}
+if(!require("tidyr")) {
+  install.packages("tidyr") 
+}
+if(!require("lubridate")) {
+  install.packages("lubridate")
+}
+if(!require("ggplot2")) {
+  install.packages("ggplot2")
+}
+library(dplyr)
+library(tidytext)
+library(tidyr) 
+library(lubridate)
+library(ggplot2)
+```
+
+
+# Climate Change Tweets
+
+# 1. Introduction
+
+I've searched for datasets on `Kaggle` and found a dataset that collects tweets regarding `Climate Change`. In other words, the dataset includes all tweets from 01/01/2022 to 19/07/2022 that include the keyword `Climate Change`  
+
+Also, for convenience, I uploaded the dataset to my github and retrieved it below using `read.csv()` and then we use `head(data)` to view the very first rows of it. 
+
+```{r}
+data <- read.csv("https://raw.githubusercontent.com/Khoagoodkid/datasets/refs/heads/main/datasets/Climate%20change_2022-1-17_2022-7-19.csv")
+
+head(data)
+```
+
+In summary, our dataset has 11 columns `UserScreenName`, `UserName`, `Timestamp`, `Text`, `Embedded_text`, `Emojis`, `Comments`, `Likes`, `Retweets`, `Image.link` and `Tweet.URL`
+
+MAIN PURPOSE: I want to assess the behavior people toward Climate Change, whether positive or negative
+
+Therefore, we just need some essential columns like `Embedded_text` to extract meaningful insights of users' opinions
+
+# 2. Data Preprocessing
+
+We want to remove rows with missing critical information in columns, especially `Embedded_text`.
+
+To do that, we use `data %>% filter(!is.na(Embedded_text))` with `filter()` function that keeps rows that has actual values in column `Embedded_text`. In other words, removing rows that has `NULL` or empty in column `Embedded_text`
+
+Then we assign filtered `data` to our current `data`
+
+```{r}
+data <- data %>%
+  filter(!is.na(Embedded_text))
+```
+
+
+Nice! Our data is now with all non-null values and ready for analysis
+
+# 3.Sentiment Analysis
+
+## a.Tokenization
+
+To make an accurate analysis on the text, we should firstly implement `tokenization`, an highly critical step in analysis.
+
+`Tokenization` is the process of splitting a piece of text into smaller units called `tokens`. In other words, converting raw text into a sequence of tokens.
+
+We use `data %>% unnest_tokens(word, Embedded_text)` with the function `unnest_tokens()` to split the text `Embedded_text` in each row into individual words (tokens) and expand the dataset so that each token becomes its own row with a new column `word` created
+
+The output then assigned to `tokenized_data`
+
+We use `head(tokenized_data[c("UserScreenName", "word")])` to visualize the changes
+```{r}
+tokenized_data <- data %>%
+  unnest_tokens(word, Embedded_text)
+head(tokenized_data[c("UserScreenName", "word")])
+```
+
+## b.Stopword Removal
+
+We want to view how frequently the words have been used, then we use `count()` to map out the frequency of each words and then sort them by decreasing frequency `sort=TRUE`
+
+```{r}
+word_counts <- tokenized_data %>%
+  count(word, sort = TRUE)
+head(word_counts)
+```
+
+Noticeably, our data still, however, has some problems. There are too many meaningless words like `the`, `to`, `and`, ... that do not contribute to the meaning of the text. 
+
+We want to remove or filter out these commonly used words by using `anti_join(stop_words, by = "word")` with:
+
+- `stop_words`: the dataset from the `tidytext` package, which includes some specific meaningless words
+
+- `anti_join()`: to remove tokens that are int the `stop_words` list
+
+However, `data("stop_words")` must be run first to load our stopwords
+
+```{r}
+#data("stop_words")
+cleaned_tokens <- tokenized_data %>%
+  anti_join(stop_words, by = "word")
+```
+
+
+
+Then we want to view the changes in words frequencies. Again, we use `count()` to map out the frequency of each words and then sort them by decreasing frequency `sort=TRUE`
+
+```{r}
+word_counts <- cleaned_tokens %>%
+  count(word, sort = TRUE)
+head(word_counts)
+```
+
+Our data has been cleaned nicely, some meaningful words, like `climate`, `change`,..., still stays.
+
+## c.Calculate sentiment scores
+
+To measure the emotional tone of the text in the `Embedded_text` column by assigning a sentiment score (positive, negative, neutral) to each token using a predefined sentiment lexicons called `bing`.
+
+We implement `inner_join(get_sentiments("bing"), by = "word")` to match each token from our dataset to the `bing` lexicon and keep only the words that have sentiment value (positive or negative)
+
+A new column called `sentiment` is created in each row, then we want to visualize them by using `head(sentiment_tokens[c("UserScreenName", "word", "sentiment")])`
+
+```{r}
+
+sentiment_tokens <- cleaned_tokens %>%
+  inner_join(get_sentiments("bing"), by = "word")
+
+head(sentiment_tokens[c("UserScreenName", "word", "sentiment")])
+```
+
+We are able to see that some words are assesed as either positive or negative, like `freedom` as positive and `fails` as negative
+
+Now we are good to calculate the sentiment scores: 
+
+- `count(UserScreenName, sentiment)`: counts the number of positive and negative words for each user
+
+- `spread(sentiment, n, fill = 0)`: converts the data from long to wide format with separate positive and negative columns
+
+- `mutate(Sentiment_Score = positive - negative)`: calculates the sentiment score by subtracting the count of negative words from positive words and assign it to new column `Sentiment_Score`
+
+Then we assign our output to `sentiment_scores` and view it `head(sentiment_scores)`
+
+```{r}
+sentiment_scores <- sentiment_tokens %>%
+  count(UserScreenName, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(Sentiment_Score = positive - negative)
+head(sentiment_scores)
+```
+
+
+As we can see, a new numerical column `Sentiment_Score` represents for the emotional tone of text: a positive and negative score means text contains words associated with positivity and negativity, respectively
+
+# 4.Visualization
+
+## 1.Convert Timestamp to Date
+We want a specific visualization of the trend words being used through out 7 months in 2022 regarding Climate Change
+
+First, since its a time plot, we need to extract the `Timestamp` column to readable values of date. We use `mutate(Date = as.Date(Timestamp))` with:
+- `mutate()` function: to add or modify a column in the dataset 
+- `as.Date(Timestamp)`: to convert the `Timestamp` column into a `Date` object(YYYY-MM-DD) 
+
+Then we use `head()` to view the change
+```{r}
+tokenized_data <- tokenized_data %>%
+  mutate(Date = as.Date(Timestamp))
+
+head(tokenized_data[c("Timestamp", "Date")])
+```
+
+Our new column `Date` has been created with nicely displayed YYYY-MM-DD format, which is more readable than the previous
+
+## 2.Perform Sentiment Analysis over time
+
+To breakdown our process of analysis:
+
+- `inner_join(get_sentiments("bing"))`: joins `tokenized_data` with the Bing sentiment lexicon and adds `sentiment` column to our data
+
+- `group_by(Date)`: we group the data by the `Date` column to calculate sentiment scores for each date
+
+- `summarise(Sentiment_Score = sum(ifelse(sentiment == "positive", 1, -1)))`: We assigns +1 for positive words and -1 for negative words and do `sum()` to sum the numerical sentiment values for each date to compute an overall sentiment score
+
+Then we use `head()` to view our dataframe
+```{r}
+sentiment_trend <- tokenized_data %>%
+  inner_join(get_sentiments("bing")) %>%
+  group_by(Date) %>%
+  summarise(Sentiment_Score = sum(ifelse(sentiment == "positive", 1, -1)))
+
+head(sentiment_trend)
+```
+
+Each date has a corresponding value of sentiment score, we are good to plot them out
+
+
+## Visualize Sentiment Trends
+
+We use `ggplot2` library to plot it out:
+
+- `ggplot(sentiment_trend, aes(x = Date, y = Sentiment_Score))`: initialize a `ggplot` object using our `sentiment_trend` data with `Date` as x-axis and `Sentiment_Score` as the y-axis
+
+- `geom_line()`: add a line plot to visualize the trend of sentiment scores over time
+
+- `labs(title = "Sentiment Trend Over Time", x = "Date", y = "Sentiment Score")`: add labels to plot with title, x and y axes
+```{r}
+ggplot(sentiment_trend, aes(x = Date, y = Sentiment_Score)) +
+  geom_line() +
+  labs(title = "Sentiment Trend Over Time", x = "Date", y = "Sentiment Score")
+
+```
+
+In general, we have some observations on the plot:
+
+- The sentiment scores fluctuate during the 7 months, i.e. no clear trends of strong increase or decrease
+
+- However, the sentiment scores are mainly negative, that means people have strong aversion against `Climate Change` than support
+
+In conclusion, according our analysis of sentiment scores, people are likely to fight against the change in climate since it pose a huge threat to humanity
