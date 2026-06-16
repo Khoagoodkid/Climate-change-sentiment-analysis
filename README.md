@@ -8,5 +8,5 @@ For summary of how this works, I retrieved a list of comments/opinions regarding
 The plot reveals a strong and widespread aversion among people toward Climate Change, highlighting their deep concern and opposition to its adverse impacts.
 
 Changed this too
-
+Added this
 <img src="https://media.licdn.com/dms/image/v2/D5622AQFex5aCHoWC2g/feedshare-shrink_800/B56ZOzXU78G4Ag-/0/1733881057446?e=1738800000&v=beta&t=z8gvck2w44xAQ0Iwa5xFC_HHYrzTb0wTDCo_ct2tF0A"/>
