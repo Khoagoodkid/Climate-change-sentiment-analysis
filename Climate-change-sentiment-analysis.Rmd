@@ -37,6 +37,9 @@ library(ggplot2)
 
 # 1. Introduction
 
+See this
+
+
 I've searched for datasets on `Kaggle` and found a dataset that collects tweets regarding `Climate Change`. In other words, the dataset includes all tweets from 01/01/2022 to 19/07/2022 that include the keyword `Climate Change`  
 
 Also, for convenience, I uploaded the dataset to my github and retrieved it below using `read.csv()` and then we use `head(data)` to view the very first rows of it. 
