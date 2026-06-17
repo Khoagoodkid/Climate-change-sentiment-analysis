@@ -1,6 +1,6 @@
 ---
 title: "Assignment 12"
-author: "Pham Anh Khoa Ha"
+author: "James Ha"
 date: "2024-12-08"
 output: html_document
 ---
